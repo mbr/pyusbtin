@@ -57,15 +57,18 @@ def test(obj, delay, id, data):
               '-f',
               type=click.Choice(['x', 'b', 'd'], ),
               default='x')
+@click.option('--count', '-c', type=int)
 @click.pass_obj
-def dump(obj, format):
+def dump(obj, format, count):
     usb_tin = obj['usb_tin']
 
     try:
         usb_tin.open_can_channel(listen_only=True)
 
-        while True:
+        num_captured = 0
+        while count is None or num_captured < count:
             click.echo(usb_tin.receive_message().format_msg(format))
+            num_captured += 1
 
     finally:
         usb_tin.close_can_channel()
