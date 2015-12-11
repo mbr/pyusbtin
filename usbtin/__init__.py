@@ -17,6 +17,9 @@ class CANMessage(object):
         self.ident = ident
         self.data = data
 
+    def __eq__(self, other):
+        return self.ident == other.ident and self.data == other.data
+
     @classmethod
     def from_usbtin_message(cls, msg):
         if msg[0] != ord('t'):
