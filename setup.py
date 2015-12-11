@@ -11,7 +11,7 @@ def read(fname):
     return buf.decode('utf8')
 
 
-setup(name='pyusbtin',
+setup(name='usbtin',
       version='0.1.dev1',
       description='Python driver for Thomas Fischl\'s USBtin',
       long_description=read('README.rst'),
@@ -23,7 +23,7 @@ setup(name='pyusbtin',
       install_requires=['click', 'pyserial'],
       entry_points={
           'console_scripts': [
-              'pyusbtin = pyusbtin.cli:cli',
+              'pyusbtin = usbtin.cli:cli',
           ],
       },
       classifiers=[
