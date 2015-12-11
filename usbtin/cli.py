@@ -31,15 +31,20 @@ def info(obj):
 
 @cli.command()
 @click.option('--delay', '-d', type=float, default=0.5)
+@click.option('--id', '-i', type=int, default=0x123)
+@click.option('--data', '-D', default=b'\x44\x55\x66', type=bytes)
 @click.pass_obj
-def test(obj, delay):
+def test(obj, delay, id, data):
     click.echo('Sending CAN packets, press C-c to abort...')
 
     usb_tin = obj['usb_tin']
 
     try:
         usb_tin.open_can_channel()
+
         while True:
+            click.echo('ID {}, data {}'.format(id, data))
+            usb_tin.transmit_standard(id, data)
             time.sleep(delay)
     finally:
         usb_tin.close_can_channel()
