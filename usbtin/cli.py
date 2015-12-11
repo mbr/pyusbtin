@@ -50,3 +50,19 @@ def test(obj, delay, id, data):
             time.sleep(delay)
     finally:
         usb_tin.close_can_channel()
+
+
+@cli.command()
+@click.pass_obj
+def dump(obj):
+    usb_tin = obj['usb_tin']
+
+    try:
+        usb_tin.open_can_channel(listen_only=True)
+
+        while True:
+            click.echo('Wait...')
+            click.echo(usb_tin.receive_frame())
+
+    finally:
+        usb_tin.close_can_channel()
