@@ -68,6 +68,8 @@ class CANMessage(object):
         if extended is None:
             if self.ident > 0x7FF:
                 self.extended = True
+            else:
+                self.extended = False
         else:
             self.extended = extended
 
