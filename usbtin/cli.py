@@ -61,7 +61,7 @@ def dump(obj):
         usb_tin.open_can_channel(listen_only=True)
 
         while True:
-            click.echo(usb_tin.receive_frame())
+            click.echo(usb_tin.receive_message())
 
     finally:
         usb_tin.close_can_channel()

@@ -2,6 +2,45 @@ import serial
 from binascii import hexlify
 
 
+def decode_hex(raw):
+    return int(raw.decode('ascii'), 16)
+
+
+class CANMessage(object):
+    FMT = {
+        'x': '<CAN id 0x{0.ident:x} data 0x{0.data:x}>',
+        'b': '<CAN id 0b{0.ident:b}b data 0b{0.data:b}>',
+        'd': '<CAN id {0.ident:d} data {0.data:d}>',
+    }
+
+    def __init__(self, ident, data):
+        self.ident = ident
+        self.data = data
+
+    @classmethod
+    def from_usbtin_message(cls, msg):
+        if msg[0] != ord('t'):
+            raise ValueError('Invalid Message: {!r}'.format(msg))
+
+        ident = decode_hex(msg[1:4])
+
+        msg_len = decode_hex(msg[4:5])
+
+        if not len(msg) - 5 == msg_len * 2:
+            raise ValueError('Broken message (message length): {!r}'.format(
+                msg))
+
+        data = decode_hex(msg[5:])
+
+        return cls(ident, data)
+
+    def format_msg(self, fmt='x'):
+        return '<CAN id 0x{0.ident:x} data 0x{0.data:x}>'.format(self)
+
+    def __str__(self):
+        return self.format_msg()
+
+
 class USBtinError(Exception):
     pass
 
@@ -103,11 +142,9 @@ class USBtin(object):
         if not b'z' == rv:
             raise USBtinError('Failed to transmit. {!r}'.format(rv))
 
-    def receive_frame(self):
+    def receive_message(self):
         msg = self._read_message()
-        if not msg[0:1] == b't':
-            raise USBtinError('Unexpected message: {!r}'.format(msg))
-        return msg
+        return CANMessage.from_usbtin_message(msg)
 
     def set_timestamping(self, timestamping):
         if timestamping:
