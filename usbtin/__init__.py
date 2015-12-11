@@ -103,6 +103,11 @@ class USBtin(object):
         if not b'z' == rv:
             raise USBtinError('Failed to transmit. {!r}'.format(rv))
 
+    def receive_frame(self):
+        msg = self._read_message()
+        if not msg[0:1] == b'T':
+            raise USBtinError('Unexpected message: {!r}'.format(msg))
+
     def set_timestamping(self, timestamping):
         if timestamping:
             self.ser.write(b'Z1\r')
