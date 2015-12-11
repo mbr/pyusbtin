@@ -8,9 +8,9 @@ def decode_hex(raw):
 
 class CANMessage(object):
     FMT = {
-        'x': '<CAN id 0x{0.ident:x} data 0x{0.data:x}>',
-        'b': '<CAN id 0b{0.ident:b}b data 0b{0.data:b}>',
-        'd': '<CAN id {0.ident:d} data {0.data:d}>',
+        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
+        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
+        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
     }
 
     def __init__(self, ident, data):
@@ -35,7 +35,7 @@ class CANMessage(object):
         return cls(ident, data)
 
     def format_msg(self, fmt='x'):
-        return '<CAN id 0x{0.ident:x} data 0x{0.data:x}>'.format(self)
+        return self.FMT[fmt].format(self)
 
     def __str__(self):
         return self.format_msg()

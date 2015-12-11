@@ -53,15 +53,19 @@ def test(obj, delay, id, data):
 
 
 @cli.command()
+@click.option('--format',
+              '-f',
+              type=click.Choice(['x', 'b', 'd'], ),
+              default='x')
 @click.pass_obj
-def dump(obj):
+def dump(obj, format):
     usb_tin = obj['usb_tin']
 
     try:
         usb_tin.open_can_channel(listen_only=True)
 
         while True:
-            click.echo(usb_tin.receive_message())
+            click.echo(usb_tin.receive_message().format_msg(format))
 
     finally:
         usb_tin.close_can_channel()
