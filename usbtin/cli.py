@@ -1,3 +1,4 @@
+from binascii import hexlify
 import time
 
 import click
@@ -43,7 +44,8 @@ def test(obj, delay, id, data):
         usb_tin.open_can_channel()
 
         while True:
-            click.echo('ID {}, data {}'.format(id, data))
+            click.echo('ID {}, data [hex] {}'.format(id, hexlify(data).decode(
+                'ascii')))
             usb_tin.transmit_standard(id, data)
             time.sleep(delay)
     finally:
