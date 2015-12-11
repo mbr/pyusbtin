@@ -187,7 +187,7 @@ class USBtin(object):
         return True
 
     def open_loopback_mode(self):
-        self.ser.write(b'I\r')
+        self.ser.write(b'l\r')
         self._read_message()
 
     def read_mcp2515(self, register_num):
