@@ -61,7 +61,6 @@ def dump(obj):
         usb_tin.open_can_channel(listen_only=True)
 
         while True:
-            click.echo('Wait...')
             click.echo(usb_tin.receive_frame())
 
     finally:

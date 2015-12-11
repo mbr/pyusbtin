@@ -105,8 +105,9 @@ class USBtin(object):
 
     def receive_frame(self):
         msg = self._read_message()
-        if not msg[0:1] == b'T':
+        if not msg[0:1] == b't':
             raise USBtinError('Unexpected message: {!r}'.format(msg))
+        return msg
 
     def set_timestamping(self, timestamping):
         if timestamping:
