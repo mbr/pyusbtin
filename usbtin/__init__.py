@@ -43,15 +43,33 @@ def error_names(fl):
 
 
 class CANMessage(object):
-    def __init__(self, ident, data):
+    FMT = {
+        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
+        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
+        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
+    }
+
+    FMT_EX = {
+        'x': '<xCAN id 0x{0.ident:08x} data 0x{0.data:x}>',
+        'b': '<xCAN id {0.ident:029b} data 0b{0.data:b}>',
+        'd': '<xCAN id {0.ident:09d} data {0.data:d}>',
+    }
+
+    def __init__(self, ident, data, extended=None):
         self.ident = ident
         self.data = data
+
+        if extended is None:
+            if self.ident > 0x7FF:
+                self.extended = True
+        else:
+            self.extended = extended
 
     def __eq__(self, other):
         return self.ident == other.ident and self.data == other.data
 
     @classmethod
-    def from_usbtin_message(cls, msg):
+    def parse(cls, msg):
         if msg[0] == ord('T'):
             extended = True
             ident_len = 8
@@ -67,43 +85,19 @@ class CANMessage(object):
         msg_len = decode_hex(msg[msg_offset - 1:msg_offset])
 
         if not len(msg) == msg_offset + msg_len * 2:
-            import pdb
-            pdb.set_trace()  # DEBUG-REMOVEME
             raise ValueError('Broken message (message length): {!r}'.format(
                 msg))
 
         data = decode_hex(msg[msg_offset:])
 
-        if extended:
-            return CANMessageExtended(ident, data)
-        else:
-            return CANMessage(ident, data)
+        return cls(ident, data, extended)
 
     def format_msg(self, fmt='x'):
-        return self.FMT[fmt].format(self)
+        tpl = self.FMT if not self.extended else self.FMT_EX
+        return tpl[fmt].format(self)
 
     def __str__(self):
         return self.format_msg()
-
-
-class CANMessageBase(CANMessage):
-    extended = False
-
-    FMT = {
-        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
-        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
-        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
-    }
-
-
-class CANMessageExtended(CANMessage):
-    extended = True
-
-    FMT = {
-        'x': '<xCAN id 0x{0.ident:08x} data 0x{0.data:x}>',
-        'b': '<xCAN id {0.ident:029b} data 0b{0.data:b}>',
-        'd': '<xCAN id {0.ident:09d} data {0.data:d}>',
-    }
 
 
 class USBtinError(Exception):
@@ -219,8 +213,7 @@ class USBtin(object):
             raise USBtinError('Failed to transmit. {!r}'.format(rv))
 
     def receive_message(self):
-        msg = self._read_message()
-        return CANMessage.from_usbtin_message(msg)
+        return CANMessage.parse(self._read_message())
 
     def set_timestamping(self, timestamping):
         if timestamping:
