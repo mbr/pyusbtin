@@ -1,4 +1,5 @@
 import serial
+from binascii import hexlify
 
 
 class USBtinError(Exception):
@@ -83,6 +84,23 @@ class USBtin(object):
     def read_mcp2515(self, register_num):
         self.ser.write(b'G' + self._to_hexbyte(register_num) + b'\r')
         return self._from_hexbyte(self._read_message())
+
+    def transmit_standard(self, ident, data):
+        if not 0 <= len(data) <= 8:
+            raise ValueError('Maximum payload for standard frame is 8 bytes')
+
+        if ident > 0x7FF:
+            raise ValueError('Identifier out of range ([0;0x7FF]')
+
+        ident_bs = '{:03X}'.format(ident).encode('ascii')
+        buf = (b't' + ident_bs + str(len(data)).encode('ascii') + hexlify(data)
+               + b'\r')
+        print(repr(buf))
+
+        self.ser.write(buf)
+        rv = self._read_message()
+        if not b'z' == rv:
+            raise USBtinError('Failed to transmit. {!r}'.format(rv))
 
     def write_mcp2515(self, register_num, value):
         self.ser.write(b'W' + self._to_hexbyte(register_num) +
