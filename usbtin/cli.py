@@ -3,7 +3,7 @@ import time
 
 import click
 
-from . import USBtin
+from . import USBtin, error_names
 
 
 @click.group()
@@ -63,11 +63,14 @@ def dump(obj, format, count):
     usb_tin = obj['usb_tin']
 
     try:
-        usb_tin.open_can_channel(listen_only=True)
+        # Warning: Using listen_only will not work as expected
+        usb_tin.open_can_channel()
 
         num_captured = 0
         while count is None or num_captured < count:
-            click.echo(usb_tin.receive_message().format_msg(format))
+            msg = usb_tin.read_can_message()
+            click.echo(msg)
+            click.echo('error: {}'.format(error_names(usb_tin.get_errors())))
             num_captured += 1
 
     finally:

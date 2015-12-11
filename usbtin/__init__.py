@@ -1,9 +1,14 @@
 import serial
 from binascii import hexlify
+import time
 
 
 def decode_hex(raw):
     return int(raw.decode('ascii'), 16)
+
+
+def encode_hex(n):
+    return '{:02X}'.format(n).encode('ascii')
 
 
 # FIXME: bit order swapped on error codes?
@@ -54,6 +59,8 @@ class CANMessage(object):
         'd': '<xCAN id {0.ident:09d} data {0.data:d}>',
     }
 
+    MSG_TYPES = (ord('t'), ord('T'), ord('r'), ord('R'))
+
     def __init__(self, ident, data, extended=None):
         self.ident = ident
         self.data = data
@@ -103,21 +110,149 @@ class USBtinError(Exception):
     pass
 
 
-class USBtin(object):
+class USBTinCommandMixin(object):
+    CHANNEL_MODES = {'open': b'O', 'listen': b'L', 'loopback': b'l', }
+
+    def close_can_channel(self):
+        self.transmit(b'C')
+
+    def get_errors(self):
+        err = self.transmit(b'F')
+        assert err[0] == ord('F')
+
+        return err[1]
+
+    def get_firmware_version(self):
+        return self.transmit(b'v')[1:].decode('ascii')
+
+    def get_hardware_version(self):
+        return self.transmit(b'V')[1:].decode('ascii')
+
+    def get_serial_number(self):
+        return self.transmit(b'N')[1:].decode('ascii')
+
+    def set_can_baudrate(self, baudrate):
+        if isinstance(baudrate, str):
+            if not baudrate.startswith('S'):
+                raise ValueError('Baudrate must be integer or one of S[0-8]')
+
+            s_rate = int(baudrate[1:])
+            if s_rate > 8:
+                raise ValueError('Baudrate constant too large, must be <=8')
+
+            msg = 'S{}'.format(s_rate)
+            return self.transmit(msg.encode('ascii'))
+        else:
+            raise NotImplementedError('Exact baudrates not implemented')
+
+    def open_can_channel(self, mode='open'):
+        if mode not in self.CHANNEL_MODES:
+            raise ValueError('Mode must be one of {}'.format(', '.join((
+                self.CHANNEL_MODES.keys()))))
+
+        self.transmit(self.CHANNEL_MODES[mode])
+
+    def read_mcp2515(self, register_num):
+        assert 0 <= register_num <= 255
+        rv = self.transmit(b'G' + encode_hex(register_num))
+        assert len(rv) == 1
+        return decode_hex(rv)
+
+    # def transmit_standard(self, ident, data):
+    #     # FIXME: create transmit for CAN message object
+    #     # or better, replace with "socket-like" on top
+
+    #     if not 0 <= len(data) <= 8:
+    #         raise ValueError('Maximum payload for standard frame is 8 bytes')
+
+    #     if ident > 0x7FF:
+    #         raise ValueError('Identifier out of range ([0;0x7FF]')
+
+    #     ident_bs = '{:03X}'.format(ident).encode('ascii')
+    #     buf = (b't' + ident_bs + str(len(data)).encode('ascii') + hexlify(data)
+    #            + b'\r')
+
+    #     self.ser.write(buf)
+    #     rv = self._read_message()
+    #     if not b'z' == rv:
+    #         raise USBtinError('Failed to transmit. {!r}'.format(rv))
+
+    def set_timestamping(self, timestamping):
+        self.transmit('Z1' if timestamping else 'Z0')
+
+    def write_mcp2515(self, register_num, value):
+        assert 0 <= register_num <= 255
+        assert 0 <= value <= 255
+
+        self.transmit(b'W' + encode_hex(register_num) + encode_hex(value))
+
+
+class USBtinChannelMixin(object):
+    def read_can_message(self):
+        return CANMessage.parse(self.recv_can_message())
+
+
+class USBtin(USBTinCommandMixin, USBtinChannelMixin):
     def __init__(self, ser):
         self.ser = ser
+        self.can_buf = []
+        self.ctrl_buf = []
 
     def reset(self):
-        # clear stale messages
-        for i in range(2):
-            self.ser.write(b'v\r')
-            self._read_message(no_raise=True)
+        # ensure bus is closed
+        self.ser.write(b'C\r')
+        self.ser.write(b'C\r')
 
-        # close CAN bus
-        self.close_can_channel()
-        self.set_timestamping(False)
+        time.sleep(0.1)  # wait for device to catch up
 
-    def _read_message(self, no_raise=False):
+        # set bus to non-blocking
+        self.ser.timeout = 0
+
+        # discard data on bus
+        while self.ser.read(1):
+            pass
+
+        # back to blocking mode
+        self.ser.timeout = None
+
+        # FIXME: re-add later
+        # # close CAN bus
+        # self.set_timestamping(False)
+
+        # # clear overflow register (see source of USBtin Java)
+        # self.write_mcp2515(0x2D, 0x00)
+
+    def transmit(self, cmd):
+        # transmit command
+        self.ser.write(cmd + b'\r')
+        return self.recv_ctrl_message()
+
+    def recv_ctrl_message(self):
+        if self.ctrl_buf:
+            return self.ctrl_buf.pop(0)
+
+        while True:
+            msg = self._recv_message()
+
+            if msg and msg[0] in CANMessage.MSG_TYPES:
+                # buffer CAN messages
+                self.can_buf.append(msg)
+            else:
+                return msg
+
+    def recv_can_message(self):
+        if self.can_buf:
+            return self.can_buf.pop(0)
+
+        while True:
+            msg = self._recv_message()
+
+            if not msg or msg[0] not in CANMessage.MSG_TYPES:
+                self.ctrl_buf.append(msg)
+            else:
+                return msg
+
+    def _recv_message(self, no_raise=False):
         buf = b''
         while True:
             c = self.ser.read(1)
@@ -132,107 +267,6 @@ class USBtin(object):
                 return buf
 
             buf += c
-
-    def close_can_channel(self):
-        self.ser.write(b'C\r')
-        if self._read_message(no_raise=True) is None:
-            return False
-        return True
-
-    def get_errors(self):
-        self.ser.write(b'F\r')
-        err = self._read_message()
-
-        if not err[0] == ord('F'):
-            raise USBtinError('Expected error reply, got {!r}'.format(err))
-
-        flags = err[1]
-
-        return flags
-
-    def get_firmware_version(self):
-        self.ser.write(b'v\r')
-        return self._read_message()[1:].decode('ascii')
-
-    def get_hardware_version(self):
-        self.ser.write(b'V\r')
-        return self._read_message()[1:].decode('ascii')
-
-    def get_serial_number(self):
-        self.ser.write(b'N\r')
-        return self._read_message()[1:].decode('ascii')
-
-    def set_can_baudrate(self, baudrate):
-        if isinstance(baudrate, str):
-            if not baudrate.startswith('S'):
-                raise ValueError('Baudrate must be integer or one of S[0-8]')
-
-            s_rate = int(baudrate[1:])
-            if s_rate > 8:
-                raise ValueError('Baudrate constant too large, must be <=8')
-
-            msg = 'S{}\r'.format(s_rate).encode('ascii')
-            self.ser.write(msg)
-            return self._read_message()
-        else:
-            raise NotImplementedError('Exact baudrates not implemented')
-
-    def open_can_channel(self, listen_only=False):
-        if listen_only:
-            self.ser.write(b'L\r')
-        else:
-            self.ser.write(b'O\r')
-        if self._read_message(no_raise=True) is None:
-            return False
-        return True
-
-    def open_loopback_mode(self):
-        self.ser.write(b'l\r')
-        self._read_message()
-
-    def read_mcp2515(self, register_num):
-        self.ser.write(b'G' + self._to_hexbyte(register_num) + b'\r')
-        return self._from_hexbyte(self._read_message())
-
-    def transmit_standard(self, ident, data):
-        if not 0 <= len(data) <= 8:
-            raise ValueError('Maximum payload for standard frame is 8 bytes')
-
-        if ident > 0x7FF:
-            raise ValueError('Identifier out of range ([0;0x7FF]')
-
-        ident_bs = '{:03X}'.format(ident).encode('ascii')
-        buf = (b't' + ident_bs + str(len(data)).encode('ascii') + hexlify(data)
-               + b'\r')
-
-        self.ser.write(buf)
-        rv = self._read_message()
-        if not b'z' == rv:
-            raise USBtinError('Failed to transmit. {!r}'.format(rv))
-
-    def receive_message(self):
-        return CANMessage.parse(self._read_message())
-
-    def set_timestamping(self, timestamping):
-        if timestamping:
-            self.ser.write(b'Z1\r')
-        else:
-            self.ser.write(b'Z0\r')
-
-        self._read_message()
-
-    def write_mcp2515(self, register_num, value):
-        self.ser.write(b'W' + self._to_hexbyte(register_num) +
-                       self._to_hexbyte(value) + b'\r')
-        self._read_message()
-
-    def _to_hexbyte(self, value):
-        if not 0 <= value <= 0xFF:
-            raise ValueError('Value must be between 0x00 and 0xFF')
-        return '{:02x}'.format(value).encode('ascii')
-
-    def _from_hexbyte(self, raw):
-        return int(raw.decode('ascii'), 16)
 
     @classmethod
     def open_device(cls, dev, baudrate=115200):
