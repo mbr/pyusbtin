@@ -100,6 +100,16 @@ class CANMessage(object):
 
         return cls(ident, data, extended)
 
+    def serialize(self):
+        if self.extended:
+            header_tpl = 'T{:08x}{:1x}'
+        else:
+            header_tpl = 't{:03x}{:1x}'
+
+        header = header_tpl.format(self.ident, len(self.data)).encode('ascii')
+
+        return header + hexlify(self.data)
+
     def format_msg(self, fmt='x'):
         tpl = self.FMT if not self.extended else self.FMT_EX
         return tpl[fmt].format(self)
