@@ -18,6 +18,7 @@ class USBtin(object):
 
         # close CAN bus
         self.close_can_channel()
+        self.set_timestamping(False)
 
     def _read_message(self, no_raise=False):
         buf = b''
@@ -101,6 +102,14 @@ class USBtin(object):
         rv = self._read_message()
         if not b'z' == rv:
             raise USBtinError('Failed to transmit. {!r}'.format(rv))
+
+    def set_timestamping(self, timestamping):
+        if timestamping:
+            self.ser.write(b'Z1\r')
+        else:
+            self.ser.write(b'Z0\r')
+
+        self._read_message()
 
     def write_mcp2515(self, register_num, value):
         self.ser.write(b'W' + self._to_hexbyte(register_num) +
