@@ -25,7 +25,6 @@ def ERR_BUS(fl):
 
 def error_names(fl):
     errs = []
-    print('e {:08b}'.format(fl))
 
     if ERR_EWARN(fl):
         errs.append('Error Warning')
@@ -205,7 +204,6 @@ class USBtin(object):
         ident_bs = '{:03X}'.format(ident).encode('ascii')
         buf = (b't' + ident_bs + str(len(data)).encode('ascii') + hexlify(data)
                + b'\r')
-        print(repr(buf))
 
         self.ser.write(buf)
         rv = self._read_message()
