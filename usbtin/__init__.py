@@ -233,9 +233,11 @@ class USBtin(USBTinCommandMixin, USBtinChannelMixin):
         # FIXME: re-add later
         # # close CAN bus
         # self.set_timestamping(False)
+        self.clear_flags()
 
-        # # clear overflow register (see source of USBtin Java)
-        # self.write_mcp2515(0x2D, 0x00)
+    def clear_flags(self):
+        # clear overflow register (see source of USBtin Java)
+        self.write_mcp2515(0x2D, 0x00)
 
     def transmit(self, cmd):
         # transmit command
