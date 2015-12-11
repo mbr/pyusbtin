@@ -7,12 +7,6 @@ def decode_hex(raw):
 
 
 class CANMessage(object):
-    FMT = {
-        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
-        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
-        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
-    }
-
     def __init__(self, ident, data):
         self.ident = ident
         self.data = data
@@ -22,26 +16,58 @@ class CANMessage(object):
 
     @classmethod
     def from_usbtin_message(cls, msg):
-        if msg[0] != ord('t'):
+        if msg[0] == ord('T'):
+            extended = True
+            ident_len = 8
+        elif msg[0] == ord('t'):
+            extended = False
+            ident_len = 3
+        else:
             raise ValueError('Invalid Message: {!r}'.format(msg))
 
-        ident = decode_hex(msg[1:4])
+        msg_offset = 2 + ident_len
+        ident = decode_hex(msg[1:msg_offset - 1])
 
-        msg_len = decode_hex(msg[4:5])
+        msg_len = decode_hex(msg[msg_offset - 1:msg_offset])
 
-        if not len(msg) - 5 == msg_len * 2:
+        if not len(msg) == msg_offset + msg_len * 2:
+            import pdb
+            pdb.set_trace()  # DEBUG-REMOVEME
             raise ValueError('Broken message (message length): {!r}'.format(
                 msg))
 
-        data = decode_hex(msg[5:])
+        data = decode_hex(msg[msg_offset:])
 
-        return cls(ident, data)
+        if extended:
+            return CANMessageExtended(ident, data)
+        else:
+            return CANMessage(ident, data)
 
     def format_msg(self, fmt='x'):
         return self.FMT[fmt].format(self)
 
     def __str__(self):
         return self.format_msg()
+
+
+class CANMessageBase(CANMessage):
+    extended = False
+
+    FMT = {
+        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
+        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
+        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
+    }
+
+
+class CANMessageExtended(CANMessage):
+    extended = True
+
+    FMT = {
+        'x': '<xCAN id 0x{0.ident:08x} data 0x{0.data:x}>',
+        'b': '<xCAN id {0.ident:029b} data 0b{0.data:b}>',
+        'd': '<xCAN id {0.ident:09d} data {0.data:d}>',
+    }
 
 
 class USBtinError(Exception):
