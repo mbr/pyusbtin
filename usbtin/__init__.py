@@ -6,6 +6,42 @@ def decode_hex(raw):
     return int(raw.decode('ascii'), 16)
 
 
+# FIXME: bit order swapped on error codes?
+def ERR_EWARN(fl):
+    return bool(fl & 1 << 5)
+
+
+def ERR_RXOVR(fl):
+    return bool(fl & 1 << 4)
+
+
+def ERR_PASSIVE(fl):
+    return bool(fl & 1 << 2)
+
+
+def ERR_BUS(fl):
+    return bool(fl & 1 << 0)
+
+
+def error_names(fl):
+    errs = []
+    print('e {:08b}'.format(fl))
+
+    if ERR_EWARN(fl):
+        errs.append('Error Warning')
+
+    if ERR_RXOVR(fl):
+        errs.append('Data overrun')
+
+    if ERR_PASSIVE(fl):
+        errs.append('Error-Passive')
+
+    if ERR_BUS(fl):
+        errs.append('Bus error')
+
+    return errs
+
+
 class CANMessage(object):
     def __init__(self, ident, data):
         self.ident = ident
@@ -109,6 +145,17 @@ class USBtin(object):
         if self._read_message(no_raise=True) is None:
             return False
         return True
+
+    def get_errors(self):
+        self.ser.write(b'F\r')
+        err = self._read_message()
+
+        if not err[0] == ord('F'):
+            raise USBtinError('Expected error reply, got {!r}'.format(err))
+
+        flags = err[1]
+
+        return flags
 
     def get_firmware_version(self):
         self.ser.write(b'v\r')
