@@ -191,6 +191,9 @@ class USBtinChannelMixin(object):
     def read_can_message(self):
         return CANMessage.parse(self.recv_can_message())
 
+    def write_can_message(self):
+        raise NotImplementedError()
+
 
 class USBtin(USBTinCommandMixin, USBtinChannelMixin):
     def __init__(self, ser):
