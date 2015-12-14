@@ -48,15 +48,15 @@ def error_names(fl):
 
 class CANMessage(object):
     FMT = {
-        'x': '<CAN id 0x{0.ident:03x} data 0x{0.data:x}>',
-        'b': '<CAN id {0.ident:011b} data 0b{0.data:b}>',
-        'd': '<CAN id {0.ident:04d} data {0.data:d}>',
+        'x': '<CAN id 0x{0.ident:03x} data {0.data!r}>',
+        'b': '<CAN id {0.ident:011b} data {0.data!r}>',
+        'd': '<CAN id {0.ident:04d} data {0.data!r}>',
     }
 
     FMT_EX = {
-        'x': '<xCAN id 0x{0.ident:08x} data 0x{0.data:x}>',
-        'b': '<xCAN id {0.ident:029b} data 0b{0.data:b}>',
-        'd': '<xCAN id {0.ident:09d} data {0.data:d}>',
+        'x': '<xCAN id 0x{0.ident:08x} data {0.data!r}>',
+        'b': '<xCAN id {0.ident:029b} data {0.data!r}>',
+        'd': '<xCAN id {0.ident:09d} data {0.data!r}>',
     }
 
     MSG_TYPES = (ord('t'), ord('T'), ord('r'), ord('R'))
