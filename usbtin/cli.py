@@ -3,7 +3,12 @@ import time
 
 import click
 
-from . import USBtin, error_names
+from . import USBtin, error_names, CANMessage
+
+
+# FIXME: copied over from portflakes
+def parse_8bit(user_input):
+    return user_input.encode('ascii').decode('unicode_escape').encode('latin1')
 
 
 @click.group()
@@ -69,9 +74,39 @@ def dump(obj, format, count):
         num_captured = 0
         while count is None or num_captured < count:
             msg = usb_tin.read_can_message()
-            click.echo(msg)
+            click.echo(msg.format_msg(format))
             click.echo('error: {}'.format(error_names(usb_tin.get_errors())))
             num_captured += 1
+            usb_tin.clear_flags()
 
+    finally:
+        usb_tin.close_can_channel()
+
+
+@cli.command()
+@click.argument('ident', type=int)
+@click.argument('data', type=parse_8bit)
+@click.option('--receive', '-r', default=0, type=float)
+@click.pass_obj
+def send(obj, ident, data, receive):
+    usb_tin = obj['usb_tin']
+
+    msg = CANMessage(ident, data)
+    click.echo('Sending {}'.format(msg))
+
+    try:
+        usb_tin.open_can_channel()
+        if receive:
+            click.echo('Receiving for {:.2f} seconds'.format(receive))
+
+            count = 0
+            start = time.time()
+            while time.time() - start < receive:
+                usb_tin.read_can_message()
+                count += 1
+
+            click.echo('Received {} CAN messages'.format(count))
+
+        usb_tin.send_can_message(msg)
     finally:
         usb_tin.close_can_channel()

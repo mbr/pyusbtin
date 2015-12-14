@@ -170,25 +170,6 @@ class USBTinCommandMixin(object):
         assert len(rv) == 1
         return decode_hex(rv)
 
-    # def transmit_standard(self, ident, data):
-    #     # FIXME: create transmit for CAN message object
-    #     # or better, replace with "socket-like" on top
-
-    #     if not 0 <= len(data) <= 8:
-    #         raise ValueError('Maximum payload for standard frame is 8 bytes')
-
-    #     if ident > 0x7FF:
-    #         raise ValueError('Identifier out of range ([0;0x7FF]')
-
-    #     ident_bs = '{:03X}'.format(ident).encode('ascii')
-    #     buf = (b't' + ident_bs + str(len(data)).encode('ascii') + hexlify(data)
-    #            + b'\r')
-
-    #     self.ser.write(buf)
-    #     rv = self._read_message()
-    #     if not b'z' == rv:
-    #         raise USBtinError('Failed to transmit. {!r}'.format(rv))
-
     def set_timestamping(self, timestamping):
         self.transmit('Z1' if timestamping else 'Z0')
 
@@ -203,8 +184,8 @@ class USBtinChannelMixin(object):
     def read_can_message(self):
         return CANMessage.parse(self.recv_can_message())
 
-    def write_can_message(self):
-        raise NotImplementedError()
+    def send_can_message(self, msg):
+        self.transmit(msg.serialize())
 
 
 class USBtin(USBTinCommandMixin, USBtinChannelMixin):
