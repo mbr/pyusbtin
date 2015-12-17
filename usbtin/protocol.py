@@ -62,7 +62,7 @@ class _CANFrameBase(object):
         self.ident = ident
         self.data = data
 
-    def serialize(self):
+    def __bytes__(self):
         header = self.HEADER_TPL.format(self.ident,
                                         len(self.data)).encode('ascii')
 
@@ -209,14 +209,15 @@ class SingleByte(USBtinMessage):
 
 
 class USBtinCommand(object):
-    pass
+    def __str__(self):
+        return bytes(self).decode('ascii')
 
 
 class SetBaudrate(USBtinCommand):
     def __init__(self, baudrate):
         self.baudrate = baudrate
 
-    def serialize(self):
+    def __bytes__(self):
         baudrate = self.baudrate
 
         if isinstance(baudrate, str):
@@ -243,7 +244,7 @@ class Get2515Register(USBtinCommand):
         self.register = register
         self.value = value
 
-    def serialize(self):
+    def __bytes__(self):
         return b'G' + encode_hex(self.register) + b'\r'
 
 
@@ -258,13 +259,13 @@ class Set2515Register(USBtinCommand):
         self.register = register
         self.value = value
 
-    def serialize(self):
+    def __bytes__(self):
         return (
             b'W' + encode_hex(self.register) + encode_hex(self.value) + b'\r')
 
 
 class ParameterLessCommand(USBtinCommand):
-    def serialize(self):
+    def __bytes__(self):
         return self.CMD_SEQ
 
 
@@ -304,7 +305,7 @@ class SetTimestamping(USBtinMessage):
     def __init__(self, state):
         self.state = state
 
-    def serialize(self):
+    def __bytes__(self):
         if self.state:
             return b'Z1\r'
         return b'Z0\r'
@@ -317,7 +318,7 @@ class SetFilterMask(USBtinCommand):
 
         self.mask = mask
 
-    def serialize(self):
+    def __bytes__(self):
         return 'm{:08X}\r'.format(self.mask).encode('ascii')
 
 
@@ -328,7 +329,7 @@ class SetFilterCode(USBtinCommand):
 
         self.code = code
 
-    def serialize(self):
+    def __bytes__(self):
         return 'M{:08X}\r'.format(self.code).encode('ascii')
 
 
@@ -336,8 +337,8 @@ class _SendCANFrameBase(USBtinCommand):
     def __init__(self, frame):
         self.frame = frame
 
-    def serialize(self):
-        return self.CMD + self.frame.serialize() + b'\r'
+    def __bytes__(self):
+        return self.CMD + bytes(self.frame) + b'\r'
 
     @classmethod
     def with_frame(cls, ident, data):
@@ -371,7 +372,7 @@ class _SendCANRequestBase(USBtinCommand):
         self.ident = ident
         self.data_len = data_len
 
-    def serialize(self):
+    def __bytes__(self):
         return self.MSG_TPL.format(self.ident, self.data_len).encode('ascii')
 
 
