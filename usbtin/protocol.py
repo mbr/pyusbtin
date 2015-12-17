@@ -6,6 +6,7 @@ from .util import decode_hex, encode_hex
 
 class USBtinMessage(object):
     is_ok = True
+    is_can = False
 
     @classmethod
     def parse(cls, buf):
@@ -115,6 +116,8 @@ class CANExtendedFrame(_CANFrameBase):
 
 
 class _CANBaseMessage(USBtinMessage):
+    is_can = True
+
     @classmethod
     def parse(cls, msg):
         m = cls()
@@ -132,6 +135,8 @@ class CANExtendedMessage(_CANBaseMessage):
 
 
 class _CANBaseRequest(USBtinMessage):
+    is_can = True
+
     @classmethod
     def parse(cls, msg):
         r = cls()

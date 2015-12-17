@@ -8,3 +8,11 @@ class MessageParsingError(USBtinError):
 
 class UnknownMessageTypeError(USBtinError):
     pass
+
+
+class QueueNotEmptyError(USBtinError):
+    pass
+
+
+class RemoteError(USBtinError):
+    pass
