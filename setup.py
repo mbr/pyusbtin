@@ -12,7 +12,7 @@ def read(fname):
 
 
 setup(name='usbtin',
-      version='0.1.dev1',
+      version='0.2.dev1',
       description='Python driver for Thomas Fischl\'s USBtin',
       long_description=read('README.rst'),
       author='Marc Brinkmann',
