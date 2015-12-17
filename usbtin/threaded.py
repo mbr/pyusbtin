@@ -13,36 +13,38 @@ class USBtinThread(Thread):
 
     def __init__(self, ser, reset=True):
         super(USBtinThread, self).__init__()
-        self._thread.setDaemon(True)
-
-        if reset:
-            self._reset()
-
+        self.setDaemon(True)
         self.ser = ser
         self.can_queue = Queue()
         self.ctrl_queue = Queue()
         self.send_lock = Lock()
         self.stopped = None
 
+        if reset:
+            self._reset()
+
     def _reset(self):
         # NOT threadsafe!
         # ensure bus is closed
         self.ser.write(b'C\rC\r')
 
-        time.sleep(0.1)  # wait for device to catch up
+        # set bus to low timeout to clear
+        self.ser.timeout = 0.2
 
-        # set bus to non-blocking
-        self.ser.timeout = 0
+        # write commands
+        self.ser.write(bytes(SetTimestamping(False)))
+        self.ser.write(bytes(Set2515Register(0x2D, 0x00)))
 
         # discard data on bus
         while self.ser.read(1):
+            # buf = self.ser.read(1)
+            # if not buf:
+            #     break
+            # print('READ', buf)
             pass
 
         # back to blocking with timeout mode
         self.ser.timeout = self.POLL_FOR_STOP
-
-        self.write(SetTimestamping(False).serialize())
-        self.write(Set2515Register(0x2D, 0x00).serialize())
 
     def run(self):
         # note: run may throw, blocking others
@@ -74,7 +76,7 @@ class USBtinThread(Thread):
             if not self.ctrl_queue.empty():
                 raise QueueNotEmptyError('Control queue is not empty')
 
-            self.write(bytes(cmd))
+            self.ser.write(bytes(cmd))
             response = self.ctrl_queue.get()
 
             if not response.is_ok:
