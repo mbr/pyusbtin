@@ -1,9 +1,11 @@
-from binascii import hexlify
 import time
 
 import click
 
-from . import USBtin, error_names, CANMessage
+from .ctx import open_channel
+from .protocol import (SetBaudrate, GetFirmwareVersion, GetHardwareVersion,
+                       GetSerialNumber, SendCANFrame, SendCANExtendedFrame)
+from .threaded import USBtinThread
 
 
 # FIXME: copied over from portflakes
@@ -18,9 +20,12 @@ def parse_8bit(user_input):
 def cli(ctx, dev, baudrate):
     ctx.obj = obj = {}
     obj['dev'] = dev
-    usb_tin = USBtin.open_device(dev)
-    usb_tin.reset()
-    usb_tin.set_can_baudrate(baudrate)
+
+    usb_tin = USBtinThread.open_device(dev)
+    usb_tin.start()
+
+    # set initial baudrate
+    usb_tin.transmit_command(SetBaudrate(baudrate))
 
     obj['usb_tin'] = usb_tin
 
@@ -30,31 +35,34 @@ def cli(ctx, dev, baudrate):
 def info(obj):
     usb_tin = obj['usb_tin']
 
-    click.echo('Hardware Version: {}'.format(usb_tin.get_hardware_version()))
-    click.echo('Firmware Version: {}'.format(usb_tin.get_firmware_version()))
-    click.echo('Serial Number: {}'.format(usb_tin.get_serial_number()))
+    v_hw = usb_tin.transmit_command(GetHardwareVersion())
+    v_fw = usb_tin.transmit_command(GetFirmwareVersion())
+    sn = usb_tin.transmit_command(GetSerialNumber())
+
+    click.echo('Hardware Version: {0.major}.{0.minor}'.format(v_hw))
+    click.echo('Firmware Version: {0.major}.{0.minor}'.format(v_fw))
+    click.echo('Serial Number: {}'.format(sn.serial_number))
 
 
 @cli.command()
 @click.option('--delay', '-d', type=float, default=0.5)
 @click.option('--id', '-i', type=int, default=0x123)
 @click.option('--data', '-D', default=b'\x44\x55\x66', type=bytes)
+@click.option('--extended', '-E', is_flag=True)
 @click.pass_obj
-def test(obj, delay, id, data):
+def test(obj, delay, id, data, extended):
     click.echo('Sending CAN packets, press C-c to abort...')
 
     usb_tin = obj['usb_tin']
 
-    try:
-        usb_tin.open_can_channel()
+    cmd_class = SendCANExtendedFrame if extended else SendCANFrame
 
+    with open_channel(usb_tin):
         while True:
-            click.echo('ID {}, data [hex] {}'.format(id, hexlify(data).decode(
-                'ascii')))
-            usb_tin.transmit_standard(id, data)
+            msg = cmd_class.with_frame(id, data)
+            click.echo('Sending frame: {}'.format(msg.frame))
+            usb_tin.transmit_command(msg)
             time.sleep(delay)
-    finally:
-        usb_tin.close_can_channel()
 
 
 @cli.command()
@@ -67,20 +75,13 @@ def test(obj, delay, id, data):
 def dump(obj, format, count):
     usb_tin = obj['usb_tin']
 
-    try:
-        # Warning: Using listen_only will not work as expected
-        usb_tin.open_can_channel()
-
+    with open_channel(usb_tin):
         num_captured = 0
         while count is None or num_captured < count:
-            msg = usb_tin.read_can_message()
-            click.echo(msg.format_msg(format))
-            click.echo('error: {}'.format(error_names(usb_tin.get_errors())))
-            num_captured += 1
-            usb_tin.clear_flags()
+            msg = usb_tin.recv_can_message()
 
-    finally:
-        usb_tin.close_can_channel()
+            click.echo(msg.frame.format_msg(format))
+            num_captured += 1
 
 
 @cli.command()

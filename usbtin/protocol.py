@@ -20,7 +20,7 @@ class USBtinMessage(object):
                 return CANRequest.parse(buf)
             elif buf[0] == ord('R'):
                 return CANExtendedRequest.parse(buf)
-            elif buf == b'z\r':
+            elif buf == b'z\r' or buf == b'Z\r':
                 return SendOk()
             elif buf == b'\r':
                 return Ok()
@@ -32,7 +32,7 @@ class USBtinMessage(object):
                 return HardwareVersion.parse(buf)
             elif buf[0] == ord('N'):
                 return SerialNumber.parse(buf)
-            elif buf[0] in ord('F'):
+            elif buf[0] == ord('F'):
                 return ErrorFlags.parse(buf)
             elif len(buf) == 3:
                 return SingleByte.parse(buf)
@@ -55,7 +55,7 @@ class _CANFrameBase(object):
                 'Identifier too large (max: {:X}, actual: {:X}'.format(
                     ident, self.MAX_IDENT))
 
-        if 0 <= len(data) <= self.MAX_DATA:
+        if not 0 <= len(data) <= self.MAX_DATA:
             raise ValueError('Too much data ({}), max is {} bytes'.format(
                 len(data),
                 self.MAX_DATA, ))
@@ -82,11 +82,12 @@ class _CANFrameBase(object):
 
         msg_len = decode_hex(msg[msg_offset - 1:msg_offset])
 
-        if not len(msg) == msg_offset + msg_len * 2:
+        if not len(msg) == msg_offset + msg_len * 2 + 1:
             raise MessageParsingError(
                 'Broken message (message length): {!r}'.format(msg))
 
-        data = decode_hex(msg[msg_offset:])
+        data = bytes(decode_hex(msg[i:i + 2])
+                     for i in range(msg_offset, msg_offset + msg_len * 2, 2))
 
         return cls(ident, data)
 
@@ -94,7 +95,7 @@ class _CANFrameBase(object):
 class CANFrame(_CANFrameBase):
     IDENT_LEN = 3
     MAX_IDENT = 0x7FF
-    HEADER_TPL = 't{:03x}{:1x}'
+    HEADER_TPL = '{:03x}{:1x}'
 
     FMT = {
         'x': '<CAN id 0x{0.ident:03x} data {0.data!r}>',
@@ -106,7 +107,7 @@ class CANFrame(_CANFrameBase):
 class CANExtendedFrame(_CANFrameBase):
     IDENT_LEN = 8
     MAX_IDENT = 0x1FFFFFFF
-    HEADER_TPL = 'T{:08x}{:1x}'
+    HEADER_TPL = '{:08x}{:1x}'
 
     FMT = {
         'x': '<xCAN id 0x{0.ident:08x} data {0.data!r}>',
@@ -121,7 +122,7 @@ class _CANBaseMessage(USBtinMessage):
     @classmethod
     def parse(cls, msg):
         m = cls()
-        m.can_frame = cls.FRAME_CLASS.parse_from_msg(msg)
+        m.frame = cls.FRAME_CLASS.parse_from_msg(msg)
 
         return m
 
@@ -350,12 +351,12 @@ class _SendCANFrameBase(USBtinCommand):
 
 class SendCANFrame(_SendCANFrameBase):
     FRAME_CLASS = CANFrame
-    CMD = 't'
+    CMD = b't'
 
 
 class SendCANExtendedFrame(_SendCANFrameBase):
     FRAME_CLASS = CANExtendedFrame
-    CMD = 'T'
+    CMD = b'T'
 
 
 class _SendCANRequestBase(USBtinCommand):
@@ -367,7 +368,7 @@ class _SendCANRequestBase(USBtinCommand):
                 'Identifier too large (max: {:X}, actual: {:X}'.format(
                     ident, self.MAX_IDENT))
 
-        if 0 <= data_len <= self.MAX_DATA_LEN:
+        if not 0 <= data_len <= self.MAX_DATA_LEN:
             raise ValueError('data_len too large ({}), max is {} bytes'.format(
                 data_len,
                 self.MAX_DATA_LEN, ))

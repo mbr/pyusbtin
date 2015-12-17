@@ -2,7 +2,6 @@ from queue import Queue
 from threading import Lock, Thread
 
 import serial
-import time
 
 from .exc import QueueNotEmptyError, RemoteError
 from .protocol import USBtinMessage, Set2515Register, SetTimestamping
@@ -45,6 +44,9 @@ class USBtinThread(Thread):
 
         # back to blocking with timeout mode
         self.ser.timeout = self.POLL_FOR_STOP
+
+    def recv_can_message(self):
+        return self.can_queue.get()
 
     def run(self):
         # note: run may throw, blocking others
