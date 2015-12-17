@@ -141,8 +141,9 @@ class _CANBaseRequest(USBtinMessage):
     @classmethod
     def parse(cls, msg):
         r = cls()
-        r.ident = int(r[1:1 + cls.IDENT_LEN].decode('ascii'), 16)
-        r.data_length = int(r[1 + cls.IDENT_LEN].decode('ascii'), 16)
+        r.ident = int(msg[1:1 + cls.IDENT_LEN].decode('ascii'), 16)
+        r.data_length = int(
+            msg[1 + cls.IDENT_LEN:2 + cls.IDENT_LEN].decode('ascii'), 16)
         return r
 
 
