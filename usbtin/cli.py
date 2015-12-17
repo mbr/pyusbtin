@@ -4,7 +4,8 @@ import click
 
 from .ctx import open_channel
 from .protocol import (SetBaudrate, GetFirmwareVersion, GetHardwareVersion,
-                       GetSerialNumber, SendCANFrame, SendCANExtendedFrame)
+                       GetSerialNumber, SendCANFrame, SendCANExtendedFrame,
+                       SendCANRequest, SendCANExtendedRequest)
 from .threaded import USBtinThread
 
 
@@ -48,31 +49,34 @@ def info(obj):
 @click.option('--delay', '-d', type=float, default=0.5)
 @click.option('--id', '-i', type=int, default=0x123)
 @click.option('--data', '-D', default=b'\x44\x55\x66', type=bytes)
+@click.option('--data-len', '-n', default=0)
 @click.option('--extended', '-E', is_flag=True)
+@click.option('--rtr', '-r', is_flag=True)
 @click.pass_obj
-def test(obj, delay, id, data, extended):
+def send(obj, delay, id, data, extended, rtr, data_len):
     click.echo('Sending CAN packets, press C-c to abort...')
 
     usb_tin = obj['usb_tin']
 
-    cmd_class = SendCANExtendedFrame if extended else SendCANFrame
+    # build message
+    if rtr:
+        cls = (SendCANExtendedRequest if extended else SendCANRequest)
+        msg = cls(id, data_len)
+    else:
+        cls = SendCANExtendedFrame if extended else SendCANFrame
+        msg = cls.with_frame(id, data)
 
     with open_channel(usb_tin):
         while True:
-            msg = cmd_class.with_frame(id, data)
-            click.echo('Sending frame: {}'.format(msg.frame))
+            click.echo('Sending: {}'.format(msg))
             usb_tin.transmit_command(msg)
             time.sleep(delay)
 
 
 @cli.command()
-@click.option('--format',
-              '-f',
-              type=click.Choice(['x', 'b', 'd'], ),
-              default='x')
 @click.option('--count', '-c', type=int)
 @click.pass_obj
-def dump(obj, format, count):
+def dump(obj, count):
     usb_tin = obj['usb_tin']
 
     with open_channel(usb_tin):
@@ -80,34 +84,5 @@ def dump(obj, format, count):
         while count is None or num_captured < count:
             msg = usb_tin.recv_can_message()
 
-            click.echo(msg.frame.format_msg(format))
+            click.echo(msg)
             num_captured += 1
-
-
-@cli.command()
-@click.argument('ident', type=int)
-@click.argument('data', type=parse_8bit)
-@click.option('--receive', '-r', default=0, type=float)
-@click.pass_obj
-def send(obj, ident, data, receive):
-    usb_tin = obj['usb_tin']
-
-    msg = CANMessage(ident, data)
-    click.echo('Sending {}'.format(msg))
-
-    try:
-        usb_tin.open_can_channel()
-        if receive:
-            click.echo('Receiving for {:.2f} seconds'.format(receive))
-
-            count = 0
-            start = time.time()
-            while time.time() - start < receive:
-                usb_tin.read_can_message()
-                count += 1
-
-            click.echo('Received {} CAN messages'.format(count))
-
-        usb_tin.send_can_message(msg)
-    finally:
-        usb_tin.close_can_channel()
