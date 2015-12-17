@@ -172,7 +172,7 @@ class VersionString(USBtinMessage):
         v.major = decode_hex(buf[1:3])
         v.minor = decode_hex(buf[3:5])
 
-        return cls
+        return v
 
 
 class HardwareVersion(VersionString):
@@ -233,9 +233,7 @@ class SetBaudrate(USBtinCommand):
             if s_rate > 8:
                 raise ValueError('Baudrate constant too large, must be <=8')
 
-            return s_rate.encode('ascii') + b'\r'
-
-            cmd = 'S{}'.format(s_rate)
+            cmd = 'S{}\r'.format(s_rate)
             return cmd.encode('ascii')
         else:
             raise NotImplementedError('Exact baudrates not implemented')
@@ -275,35 +273,35 @@ class ParameterLessCommand(USBtinCommand):
 
 
 class GetHardwareVersion(ParameterLessCommand):
-    CMD_SEQ = 'V\r'
+    CMD_SEQ = b'V\r'
 
 
 class GetFirmwareVersion(ParameterLessCommand):
-    CMD_SEQ = 'v\r'
+    CMD_SEQ = b'v\r'
 
 
 class GetSerialNumber(ParameterLessCommand):
-    CMD_SEQ = 'N\r'
+    CMD_SEQ = b'N\r'
 
 
 class OpenCANChannel(ParameterLessCommand):
-    CMD_SEQ = 'O\r'
+    CMD_SEQ = b'O\r'
 
 
 class OpenListenChannel(ParameterLessCommand):
-    CMD_SEQ = 'L\r'
+    CMD_SEQ = b'L\r'
 
 
 class OpenLoopbackChannel(ParameterLessCommand):
-    CMD_SEQ = 'l\r'
+    CMD_SEQ = b'l\r'
 
 
 class CloseCANChannel(ParameterLessCommand):
-    CMD_SEQ = 'C\r'
+    CMD_SEQ = b'C\r'
 
 
 class ReadErrorFlags(ParameterLessCommand):
-    CMD_SEQ = 'F\r'
+    CMD_SEQ = b'F\r'
 
 
 class SetTimestamping(USBtinMessage):
