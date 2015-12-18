@@ -230,14 +230,10 @@ class SetBaudrate(USBtinCommand):
         baudrate = self.baudrate
 
         if isinstance(baudrate, str):
-            if not baudrate.startswith('S'):
-                raise ValueError('Baudrate must be integer or one of S[0-8]')
-
-            s_rate = int(baudrate[1:])
-            if s_rate > 8:
-                raise ValueError('Baudrate constant too large, must be <=8')
-
-            cmd = 'S{}\r'.format(s_rate)
+            if baudrate not in BAUDRATE_PRESETS:
+                raise ValueError('Invalid baudrate preset: {}'.format(
+                    baudrate))
+            cmd = baudrate + '\r'
             return cmd.encode('ascii')
         else:
             raise NotImplementedError('Exact baudrates not implemented')
