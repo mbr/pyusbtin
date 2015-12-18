@@ -3,6 +3,8 @@ from binascii import hexlify
 from .exc import MessageParsingError, UnknownMessageTypeError
 from .util import decode_hex, encode_hex
 
+BAUDRATE_PRESETS = ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']
+
 
 class USBtinMessage(object):
     is_ok = True

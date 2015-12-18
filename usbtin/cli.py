@@ -1,4 +1,5 @@
 import time
+from queue import Empty
 import sys
 
 import click
@@ -6,7 +7,8 @@ import click
 from .ctx import open_channel
 from .protocol import (SetBaudrate, GetFirmwareVersion, GetHardwareVersion,
                        GetSerialNumber, SendCANFrame, SendCANExtendedFrame,
-                       SendCANRequest, SendCANExtendedRequest)
+                       SendCANRequest, SendCANExtendedRequest,
+                       BAUDRATE_PRESETS)
 from .threaded import USBtinThread
 
 BAUD_INFO = {
@@ -22,6 +24,35 @@ BAUD_INFO = {
 }
 
 
+def detect_baudrate(usb_tin, timeout):
+    print('Auto-detecting baudrate; {:.0f} ms timeout: '.format(timeout *
+                                                                1000),
+          end='',
+          file=sys.stderr)
+
+    for baudrate in BAUDRATE_PRESETS:
+        print(baudrate, end=' ', file=sys.stderr)
+        sys.stderr.flush()
+
+        try:
+            usb_tin.recv_can_message(timeout=timeout)
+            print('*', file=sys.stderr)
+            break
+        except Empty:
+            continue
+    else:
+        baudrate = None
+        print('all failed', file=sys.stderr)
+
+    if baudrate is None:
+        print('No packets detected, aborting', file=sys.stderr)
+        sys.exit(1)
+
+        time.sleep(timeout)
+
+    return baudrate
+
+
 # FIXME: copied over from portflakes
 def parse_8bit(user_input):
     return user_input.encode('ascii').decode('unicode_escape').encode('latin1')
@@ -30,13 +61,17 @@ def parse_8bit(user_input):
 @click.group()
 @click.argument('dev', type=click.Path(exists=True, dir_okay=False))
 @click.option('--baudrate', '-b', default='S0')
+@click.option('--detect-timeout', '-t', default=0.25)
 @click.pass_context
-def cli(ctx, dev, baudrate):
+def cli(ctx, dev, baudrate, detect_timeout):
     ctx.obj = obj = {}
     obj['dev'] = dev
 
     usb_tin = USBtinThread.open_device(dev)
     usb_tin.start()
+
+    if baudrate == 'auto':
+        detect_baudrate(usb_tin, detect_timeout)
 
     # set initial baudrate
     usb_tin.transmit_command(SetBaudrate(baudrate))

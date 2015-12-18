@@ -41,8 +41,8 @@ class USBtinThread(Thread):
         # back to blocking with timeout mode
         self.ser.timeout = self.POLL_FOR_STOP
 
-    def recv_can_message(self):
-        return self.can_queue.get()
+    def recv_can_message(self, timeout=None):
+        return self.can_queue.get(timeout=timeout)
 
     def run(self):
         try:
