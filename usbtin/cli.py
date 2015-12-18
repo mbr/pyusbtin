@@ -35,7 +35,9 @@ def detect_baudrate(usb_tin, timeout):
         sys.stderr.flush()
 
         try:
-            usb_tin.recv_can_message(timeout=timeout)
+            usb_tin.transmit_command(SetBaudrate(baudrate))
+            with open_channel(usb_tin):
+                usb_tin.recv_can_message(timeout=timeout)
             print('*', file=sys.stderr)
             break
         except Empty:
@@ -71,7 +73,7 @@ def cli(ctx, dev, baudrate, detect_timeout):
     usb_tin.start()
 
     if baudrate == 'auto':
-        detect_baudrate(usb_tin, detect_timeout)
+        baudrate = detect_baudrate(usb_tin, detect_timeout)
 
     # set initial baudrate
     usb_tin.transmit_command(SetBaudrate(baudrate))
