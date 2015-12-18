@@ -45,29 +45,36 @@ class USBtinThread(Thread):
         return self.can_queue.get()
 
     def run(self):
-        # note: run may throw, blocking others
-        while not self.stopped:
-            buf = b''
-            while True:
-                c = self.ser.read(1)
+        try:
+            # note: run may throw, blocking others
+            while not self.stopped:
+                buf = b''
+                while True:
+                    c = self.ser.read(1)
 
-                # timeout, recheck for stop
-                if not c:
-                    continue
+                    # timeout, recheck for stop
+                    if not c:
+                        continue
 
-                buf += c
+                    buf += c
 
-                if c in b'\r\x07':
-                    # FIXME: add timestamp
-                    msg = USBtinMessage.parse(buf)
+                    if c in b'\r\x07':
+                        # FIXME: add timestamp
+                        msg = USBtinMessage.parse(buf)
 
-                    if msg.is_can:
-                        self.can_queue.put(msg)
-                    else:
-                        self.ctrl_queue.put(msg)
+                        if msg.is_can:
+                            self.can_queue.put(msg)
+                        else:
+                            self.ctrl_queue.put(msg)
 
-                    buf = b''
-                    continue
+                        buf = b''
+                        continue
+        finally:
+            # close port
+            self.ser.close()
+
+            # send "EOF"
+            self.can_queue.put(None)
 
     def transmit_command(self, cmd):
         with self.send_lock:
