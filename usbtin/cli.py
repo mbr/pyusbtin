@@ -1,5 +1,9 @@
+from contextlib import contextmanager, ExitStack
+from base64 import b64encode
+
 import time
 from queue import Empty
+import json
 import sys
 
 import click
@@ -22,6 +26,26 @@ BAUD_INFO = {
     'S7': '800 kBaud',
     'S8': '1 MBaud',
 }
+
+
+@contextmanager
+def json_writer(fn, mode='w'):
+    with open(fn, mode) as out:
+        need_sep = []
+
+        out.write('[\n')
+
+        def append_func(obj):
+            if need_sep:
+                out.write(',\n')
+            else:
+                need_sep.append(True)
+            out.write('  ' + json.dumps(obj))
+
+        try:
+            yield append_func
+        finally:
+            out.write('\n]\n')
 
 
 def detect_baudrate(usb_tin, timeout):
@@ -127,14 +151,27 @@ def send(obj, delay, id, data, extended, rtr, data_len):
 
 @cli.command()
 @click.option('--count', '-c', type=int)
+@click.option('-j', '--json-file', type=click.Path())
 @click.pass_obj
-def dump(obj, count):
+def dump(obj, count, json_file):
     usb_tin = obj['usb_tin']
 
-    with open_channel(usb_tin):
+    cleanup = ExitStack()
+
+    if json_file:
+        json_file = cleanup.enter_context(json_writer(json_file))
+
+    with open_channel(usb_tin), cleanup:
         num_captured = 0
         while count is None or num_captured < count:
+
             msg = usb_tin.recv_can_message()
 
+            if json_file:
+                data = {'t': time.time(),
+                        'msg': (msg.frame.ident, b64encode(msg.frame.data)), }
+                json_file(data)
+
             click.echo(msg)
+
             num_captured += 1
