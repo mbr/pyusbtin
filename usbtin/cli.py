@@ -1,4 +1,5 @@
 import time
+import sys
 
 import click
 
@@ -7,6 +8,18 @@ from .protocol import (SetBaudrate, GetFirmwareVersion, GetHardwareVersion,
                        GetSerialNumber, SendCANFrame, SendCANExtendedFrame,
                        SendCANRequest, SendCANExtendedRequest)
 from .threaded import USBtinThread
+
+BAUD_INFO = {
+    'S0': '10 kBaud',
+    'S1': '20 kBaud',
+    'S2': '50 kBaud',
+    'S3': '100 kBaud',
+    'S4': '125 kBaud',
+    'S5': '250 kBaud',
+    'S6': '500 kBaud',
+    'S7': '800 kBaud',
+    'S8': '1 MBaud',
+}
 
 
 # FIXME: copied over from portflakes
@@ -28,6 +41,8 @@ def cli(ctx, dev, baudrate):
     # set initial baudrate
     usb_tin.transmit_command(SetBaudrate(baudrate))
 
+    print("CAN Device: {}  Baudrate: {}".format(dev, BAUD_INFO.get(baudrate,
+                                                                   baudrate)))
     obj['usb_tin'] = usb_tin
 
 
