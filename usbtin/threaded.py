@@ -36,10 +36,6 @@ class USBtinThread(Thread):
 
         # discard data on bus
         while self.ser.read(1):
-            # buf = self.ser.read(1)
-            # if not buf:
-            #     break
-            # print('READ', buf)
             pass
 
         # back to blocking with timeout mode
