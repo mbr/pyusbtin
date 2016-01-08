@@ -78,6 +78,20 @@ class _CANFrameBase(object):
         return self.FMT[fmt].format(self)
 
     @classmethod
+    def create(cls, ident, data):
+        if len(data) > cls.MAX_DATA:
+            raise ValueError('data too large, max is {} bytes'.format(
+                cls.MAX_DATA))
+
+        if ident <= CANFrame.MAX_IDENT:
+            return CANFrame(ident, data)
+
+        if ident <= CANExtendedFrame.MAX_IDENT:
+            return CANExtendedFrame(ident, data)
+
+        raise ValueError('Identifier exceeds maximum ident')
+
+    @classmethod
     def parse_from_msg(cls, msg):
         msg_offset = 2 + cls.IDENT_LEN
         ident = decode_hex(msg[1:msg_offset - 1])
