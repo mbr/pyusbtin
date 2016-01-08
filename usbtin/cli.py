@@ -1,5 +1,5 @@
 from contextlib import contextmanager, ExitStack
-from base64 import b64encode
+from binascii import hexlify
 
 import time
 from queue import Empty
@@ -169,9 +169,10 @@ def dump(obj, count, json_file):
 
             if json_file:
                 data = {'t': time.time(),
-                        'msg': (msg.frame.ident, b64encode(msg.frame.data)), }
+                        'msg': (msg.frame.ident,
+                                hexlify(msg.frame.data).decode('ascii')), }
                 json_file(data)
 
-            click.echo(msg)
+            click.echo(repr(msg))
 
             num_captured += 1
